@@ -18,7 +18,17 @@ app.use((req, res, next) => {
   next();
 });
 
-// 1. Health check endpoint
+// Root health check endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({ status: 'ok', service: 'SentiBridge backend' });
+});
+
+// GET /health endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', service: 'SentiBridge backend' });
+});
+
+// 1. Health check API endpoint
 app.get('/api/health', (req, res) => {
   const hasKey = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here');
   res.json({
