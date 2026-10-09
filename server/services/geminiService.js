@@ -14,9 +14,6 @@ export async function generateInsightReport(patientData) {
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-3.8-flash" });
-
     // Enforce sending ONLY patient-submitted, approved-for-processing information
     const allowedSections = patientData.consentDetails?.sharedSections || [
       'lifeMap', 'topicPreferences', 'journalExcerpts', 'supportCompass', 'scenarios'
@@ -70,8 +67,28 @@ REQUIRED JSON FORMAT:
 }
 `;
 
-    const response = await model.generateContent(promptText);
-    const responseText = response.response.text();
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const modelsToTry = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash"];
+    let responseText = null;
+    let successfulModel = null;
+    let lastError = null;
+
+    for (const modelName of modelsToTry) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const response = await model.generateContent(promptText);
+        responseText = response.response.text();
+        successfulModel = modelName;
+        break;
+      } catch (err) {
+        console.warn(`⚠️ Model ${modelName} call failed: ${err.message}. Trying next fallback model...`);
+        lastError = err;
+      }
+    }
+
+    if (!responseText) {
+      throw lastError || new Error("All Gemini models encountered temporary demand spikes.");
+    }
     
     // Clean response text if it contains markdown JSON wrappers
     const cleanedJsonText = responseText
@@ -85,7 +102,7 @@ REQUIRED JSON FORMAT:
       ...parsedData,
       generatedAt: new Date().toISOString(),
       isDemoMode: false,
-      modelUsed: "gemini-1.5-flash"
+      modelUsed: successfulModel
     };
   } catch (error) {
     console.error("⚠️ Gemini API Call failed:", error.message);
