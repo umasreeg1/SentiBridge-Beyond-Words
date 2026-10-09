@@ -82,7 +82,9 @@ REQUIRED JSON FORMAT:
         break;
       } catch (err) {
         console.warn(`⚠️ Model ${modelName} call failed: ${err.message}. Trying next fallback model...`);
-        lastError = err;
+        if (!lastError || err.message.includes("429") || err.message.includes("Quota")) {
+          lastError = err;
+        }
       }
     }
 
@@ -106,10 +108,12 @@ REQUIRED JSON FORMAT:
     };
   } catch (error) {
     console.error("⚠️ Gemini API Call failed:", error.message);
-    return generateDemoInsight(
-      patientData,
-      `Gemini API Error: ${error.message}. Fallback to SentiBridge Demo Engine.`
-    );
+    const isQuotaError = error.message.includes("429") || error.message.includes("Quota exceeded");
+    const reasonText = isQuotaError 
+      ? `Gemini API Quota Exceeded (429 Rate Limit): Your Google Gemini API free-tier daily quota limit has been reached for model gemini-3.8-flash. Operating in structured SentiBridge Demo Mode.`
+      : `Gemini API Error: ${error.message}. Fallback to SentiBridge Demo Engine.`;
+
+    return generateDemoInsight(patientData, reasonText);
   }
 }
 
