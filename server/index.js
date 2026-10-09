@@ -287,6 +287,76 @@ app.post('/api/generate-insight', async (req, res) => {
   }
 });
 
+// 10. Patient Progress & Reflection Analytics Endpoint
+app.get('/api/patients/:id/analytics', (req, res) => {
+  const patient = patients.find(p => p.id === req.params.id);
+  if (!patient) {
+    return res.status(404).json({ error: 'Patient not found' });
+  }
+
+  // Backend Access Control Enforcement
+  if (!patient.hasApprovedSharing || patient.consentDetails?.status !== 'APPROVED') {
+    return res.status(403).json({
+      error: 'PATIENT_CONSENT_REQUIRED',
+      message: 'Access Denied: The patient has not approved sharing reflection analytics with clinical providers.',
+      patientId: patient.id,
+      consentStatus: patient.consentDetails?.status || 'PENDING_REVIEW'
+    });
+  }
+
+  const allowedSections = patient.consentDetails.sharedSections || [];
+
+  // A. Reflection Activity Timeline (by date)
+  const timelineData = (patient.journalEntries || []).map((j, idx) => ({
+    date: new Date(j.date).toLocaleDateString([], { month: 'short', day: 'numeric' }),
+    fullDate: j.date,
+    reflectionsCount: 1,
+    sessionLabel: `Session #${patient.journalEntries.length - idx}`
+  })).reverse();
+
+  // B. Topic Distribution Frequency
+  const topicCounts = {};
+  if (allowedSections.includes('topicPreferences')) {
+    (patient.topicPreferences || []).forEach(t => {
+      const category = t.status === 'WANT_HELP' ? 'Help Requested' :
+                       t.status === 'DIFFICULT_TO_DISCUSS' ? 'Difficult Topic' :
+                       t.status === 'NOT_READY' ? 'Not Ready' : 'Not Relevant';
+      topicCounts[t.topic] = { topic: t.topic, count: 1, category };
+    });
+  }
+  const topicDistribution = Object.values(topicCounts);
+
+  // C. Communication Preferences Breakdown
+  const supportPrefsData = [];
+  if (allowedSections.includes('supportCompass') && patient.supportCompass) {
+    if (patient.supportCompass.beingListenedTo) supportPrefsData.push({ name: 'Dedicated Listening', value: 85 });
+    if (patient.supportCompass.practicalSuggestions) supportPrefsData.push({ name: 'Practical Tools', value: 90 });
+    if (patient.supportCompass.timeToThink) supportPrefsData.push({ name: 'Processing Time', value: 95 });
+    if (patient.supportCompass.writingInsteadOfSpeaking) supportPrefsData.push({ name: 'Written Notes', value: 75 });
+    if (patient.supportCompass.helpMakingAPlan) supportPrefsData.push({ name: 'Step Plan', value: 80 });
+  }
+
+  // D. Reflection Section Completion Breakdown
+  const completionData = [
+    { section: 'Life Map', status: allowedSections.includes('lifeMap') ? 'Shared' : 'Hidden', score: allowedSections.includes('lifeMap') ? 100 : 0 },
+    { section: 'Topic Preferences', status: allowedSections.includes('topicPreferences') ? 'Shared' : 'Hidden', score: allowedSections.includes('topicPreferences') ? 100 : 0 },
+    { section: 'Mind Journal', status: allowedSections.includes('journalExcerpts') ? 'Shared' : 'Hidden', score: allowedSections.includes('journalExcerpts') ? 100 : 0 },
+    { section: 'Situation Stories', status: allowedSections.includes('scenarios') ? 'Shared' : 'Hidden', score: allowedSections.includes('scenarios') ? 100 : 0 },
+    { section: 'Support Compass', status: allowedSections.includes('supportCompass') ? 'Shared' : 'Hidden', score: allowedSections.includes('supportCompass') ? 100 : 0 }
+  ];
+
+  res.json({
+    patientId: patient.id,
+    patientName: patient.name,
+    isSyntheticDemoData: false,
+    disclaimer: 'Patient-reported activity metrics. Not diagnostic scores.',
+    timelineData,
+    topicDistribution,
+    supportPrefsData,
+    completionData
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 SentiBridge Backend Server listening on http://localhost:${PORT}`);
   console.log(`💡 Gemini API Key status: ${process.env.GEMINI_API_KEY ? 'CONFIGURED' : 'NOT SET (DEMO MODE)'}`);

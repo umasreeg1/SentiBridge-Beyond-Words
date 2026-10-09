@@ -173,12 +173,16 @@ export default function App() {
             {activeView === 'therapist' && !isInsightMapOpen && (
               <TherapistDashboard
                 patients={patients}
+                selectedPatientId={selectedPatientId}
                 onSelectPatient={(id) => setSelectedPatientId(id)}
                 onOpenInsightMap={handleOpenInsightMap}
                 onSwitchToPatientView={(id) => {
                   if (id) setSelectedPatientId(id);
                   setActiveView('patient');
                 }}
+                patientDataMap={{ [selectedPatientId]: activePatientData }}
+                onRefreshSuggestions={handleRegenerateInsight}
+                isRefreshing={isRegenerating}
               />
             )}
 

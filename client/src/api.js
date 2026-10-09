@@ -71,3 +71,15 @@ export async function fetchScenarios() {
   if (!res.ok) throw new Error('Failed to fetch scenarios');
   return res.json();
 }
+
+export async function fetchPatientAnalytics(id) {
+  const res = await fetch(`${API_BASE}/patients/${id}/analytics`);
+  const data = await res.json();
+  if (!res.ok) {
+    const error = new Error(data.message || 'Failed to fetch patient analytics');
+    error.status = res.status;
+    error.data = data;
+    throw error;
+  }
+  return data;
+}
