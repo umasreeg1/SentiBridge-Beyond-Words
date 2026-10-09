@@ -94,14 +94,14 @@ export default function DemoControlBar({
             {/* AI Engine Status Badge */}
             <div
               className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${
-                health?.hasGeminiApiKey
+                health?.activeMode === 'LIVE_GEMINI'
                   ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
                   : 'bg-amber-950/60 border-amber-500/40 text-amber-300'
               }`}
-              title={health?.hasGeminiApiKey ? 'Connected to Gemini API' : 'Using SentiBridge Senti-Demo Engine'}
+              title={health?.activeMode === 'LIVE_GEMINI' ? 'Connected to Live Gemini API' : 'Operating in SentiBridge Demo Mode (AI Quota Exhausted)'}
             >
               <Cpu className="w-3.5 h-3.5" />
-              <span>{health?.hasGeminiApiKey ? 'LIVE GEMINI 2.5' : 'DEMO MODE'}</span>
+              <span>{health?.activeMode === 'LIVE_GEMINI' ? 'LIVE GEMINI 3.8' : 'DEMO MODE (Quota Exhausted)'}</span>
             </div>
 
             <button

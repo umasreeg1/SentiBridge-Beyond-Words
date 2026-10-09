@@ -86,29 +86,48 @@ export default function PatientReflection({
     );
   };
 
-  const handleSubmit = async (shouldApproveSharing) => {
-    const payload = {
-      lifeMap,
-      topicPreferences,
-      journalEntry,
-      situationStories,
-      supportCompass,
-      autoApprove: shouldApproveSharing
-    };
+const handleSubmit = async (shouldApproveSharing) => {
+  if (!patientData?.id) {
+    alert("Unable to save: no patient is selected.");
+    return;
+  }
 
-    setSubmitSuccessMsg(null);
-    try {
-      await onSubmitReflection(patientData.id, payload);
-      setSubmitSuccessMsg(
-        shouldApproveSharing 
-          ? "Your reflection has been saved and shared with your therapist!" 
-          : "Your reflection has been saved as a private draft. Sharing is currently paused."
-      );
-    } catch (err) {
-      alert("Error submitting reflection: " + err.message);
-    }
+  const payload = {
+    lifeMap,
+    topicPreferences,
+    journalEntry,
+    situationStories,
+    supportCompass,
+    autoApprove: shouldApproveSharing
   };
 
+  setSubmitSuccessMsg(null);
+
+  try {
+    // Save the reflection first.
+    await onSubmitReflection(patientData.id, payload);
+
+    // Explicitly save the patient's consent choice.
+    const consentStatus = shouldApproveSharing ? "APPROVED" : "REJECTED";
+
+    await onUpdateConsent(
+      patientData.id,
+      consentStatus,
+      shouldApproveSharing ? sharedSections : []
+    );
+
+    setSubmitSuccessMsg(
+      shouldApproveSharing
+        ? "Reflection saved. Sharing approved for the selected sections."
+        : "Reflection saved as a private draft. Therapist sharing is paused."
+    );
+  } catch (err) {
+    console.error("Reflection or consent submission failed:", err);
+    alert("Could not save your choice: " + err.message);
+  }
+};
+
+  
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       

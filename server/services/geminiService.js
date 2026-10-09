@@ -81,9 +81,11 @@ REQUIRED JSON FORMAT:
         successfulModel = modelName;
         break;
       } catch (err) {
-        console.warn(`⚠️ Model ${modelName} call failed: ${err.message}. Trying next fallback model...`);
-        if (!lastError || err.message.includes("429") || err.message.includes("Quota")) {
-          lastError = err;
+        console.warn(`⚠️ Model ${modelName} call failed: ${err.message}`);
+        lastError = err;
+        if (err.message.includes("429") || err.message.includes("Quota")) {
+          // Free tier quota exhausted across models — do not repeatedly retry
+          break;
         }
       }
     }

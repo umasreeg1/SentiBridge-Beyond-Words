@@ -161,8 +161,8 @@ export default function TherapistInsightMap({
               <span>AI Pre-Session Summary (Synthesis of Patient Reports)</span>
             </div>
             {isDemo && (
-              <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-medium">
-                Demo Mode Fallback
+              <span className="text-[10px] bg-amber-500/30 text-amber-200 border border-amber-400/40 px-2.5 py-0.5 rounded-full font-semibold">
+                Demo Mode — AI quota exhausted
               </span>
             )}
           </div>
@@ -251,35 +251,87 @@ export default function TherapistInsightMap({
             </div>
           </div>
 
-          {/* Section 3: AI-Suggested Conversation Starters */}
-          <div className="bg-indigo-50/70 rounded-2xl border border-indigo-200 p-6 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-indigo-200 pb-3">
+          {/* Section 3: Conversation Bridge & Session Preparation */}
+          <div className="bg-gradient-to-br from-indigo-50/90 via-purple-50/50 to-white rounded-2xl border border-indigo-200 p-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-200 pb-3">
               <div className="flex items-center space-x-2">
                 <MessageSquare className="w-5 h-5 text-indigo-600" />
                 <h3 className="font-bold text-base text-indigo-950">
-                  Suggested Nonjudgmental Conversation Starters
+                  Conversation Bridge — Pre-Session Guide
                 </h3>
               </div>
-              <span className="text-[11px] bg-indigo-100 text-indigo-800 font-semibold px-2.5 py-0.5 rounded-full border border-indigo-300">
-                AI Suggested Questions
+              <span className="text-[11px] bg-indigo-100 text-indigo-800 font-semibold px-2.5 py-0.5 rounded-full border border-indigo-300 w-max">
+                Therapist Preparation Aid
               </span>
             </div>
 
+            <p className="text-xs text-clinical-600 leading-relaxed">
+              Synthesized from patient-approved reports to facilitate smooth, empathetic conversation opening.
+            </p>
+
+            {/* Conversation Starters List */}
             <div className="space-y-3">
               {(aiReport.suggestedConversationStarters || []).length > 0 ? (
                 aiReport.suggestedConversationStarters.map((starter, idx) => (
-                  <div key={idx} className="bg-white border border-indigo-200 rounded-xl p-4 flex items-start space-x-3 shadow-xs">
+                  <div key={idx} className="bg-white border border-indigo-200/90 rounded-xl p-4 flex items-start space-x-3 shadow-xs">
                     <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
                       {idx + 1}
                     </div>
-                    <p className="text-xs md:text-sm text-clinical-800 font-medium leading-relaxed">
-                      {starter}
-                    </p>
+                    <div className="space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-indigo-600 tracking-wider">
+                        Suggested Opening Option {idx + 1}
+                      </span>
+                      <p className="text-xs md:text-sm text-clinical-800 font-medium leading-relaxed">
+                        {starter}
+                      </p>
+                    </div>
                   </div>
                 ))
               ) : (
                 <p className="text-xs text-clinical-500 italic">No conversation starters generated.</p>
               )}
+            </div>
+
+            {/* Patient Choice & Autonomy Notice */}
+            <div className="bg-white/80 border border-indigo-100 rounded-xl p-3 text-[11px] text-indigo-900 flex items-center space-x-2 font-medium">
+              <Info className="w-4 h-4 text-indigo-500 shrink-0" />
+              <span>
+                <strong>Patient Autonomy Reminder:</strong> The patient may choose to skip any question, adjust topic order, or request writing time at any moment.
+              </span>
+            </div>
+          </div>
+
+          {/* Section 4: Reflection Journey Timeline */}
+          <div className="bg-white rounded-2xl border border-clinical-200 p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-clinical-100 pb-3">
+              <div className="flex items-center space-x-2">
+                <Calendar className="w-5 h-5 text-clinical-700" />
+                <h3 className="font-bold text-base text-clinical-900">
+                  Reflection Journey & Submission History
+                </h3>
+              </div>
+              <span className="text-[11px] bg-clinical-100 text-clinical-700 font-semibold px-2.5 py-0.5 rounded-full">
+                Saved Submissions
+              </span>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              {(patientData.journalEntries || []).map((entry, idx) => (
+                <div key={entry.id || idx} className="flex items-start space-x-3 p-3 bg-clinical-50 rounded-xl border border-clinical-100">
+                  <div className="w-2 h-2 rounded-full bg-teal-500 mt-1.5 shrink-0"></div>
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center justify-between text-clinical-800 font-semibold">
+                      <span>Reflection #{patientData.journalEntries.length - idx}</span>
+                      <span className="text-[11px] text-clinical-500 font-normal">
+                        {new Date(entry.date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </span>
+                    </div>
+                    <p className="text-clinical-600 line-clamp-1 italic text-[11px]">
+                      "{entry.mindContent || entry.difficultSituation || 'Structured Reflection'}"
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

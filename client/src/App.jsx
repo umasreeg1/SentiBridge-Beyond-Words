@@ -85,18 +85,39 @@ export default function App() {
     }
   };
 
+ 
   // Regenerate AI Insight Report
   const handleRegenerateInsight = async (patientId) => {
     setIsRegenerating(true);
+
     try {
-      await generateInsightReportApi(patientId, false);
-      // Reload insight map
+      // Request a fresh AI report from the backend
+      const result = await generateInsightReportApi(patientId, false);
+
+      if (!result?.success || !result?.report) {
+        throw new Error('The server did not return an AI report.');
+      }
+
+      // Reload the patient data, then use the fresh report returned by Gemini
       const updatedData = await fetchInsightMap(patientId);
-      setActivePatientData(updatedData);
-      // Refresh patient list
+
+      setActivePatientData({
+        ...updatedData,
+        aiInsightReport: result.report
+      });
+
+      // Refresh the therapist dashboard list
       const pts = await fetchPatients();
       setPatients(pts);
+
+      if (result.report.isDemoMode) {
+        alert(
+          'AI report refreshed, but Gemini was unavailable. ' +
+          (result.report.demoNotice || 'The report is in Demo Mode.')
+        );
+      }
     } catch (err) {
+      console.error('Error regenerating AI analysis:', err);
       alert('Error regenerating AI analysis: ' + err.message);
     } finally {
       setIsRegenerating(false);
