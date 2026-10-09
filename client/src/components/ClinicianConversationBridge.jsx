@@ -3,12 +3,20 @@ import { MessageSquare, Quote, AlertCircle, Compass, HelpCircle, Copy, Check, Sp
 
 export default function ClinicianConversationBridge({
   patientData,
+  isLoading,
+  consentError,
   onRefreshSuggestions,
   isRefreshing
 }) {
   const [copiedIndex, setCopiedIndex] = useState(null);
 
-  if (!patientData || !patientData.hasApprovedSharing || patientData.consentDetails?.status !== 'APPROVED') {
+  const isConsentDenied = Boolean(
+    consentError ||
+    (patientData && patientData.hasApprovedSharing === false) ||
+    (patientData?.consentDetails && patientData.consentDetails.status !== 'APPROVED')
+  );
+
+  if (isConsentDenied) {
     return (
       <div className="bg-white rounded-2xl border border-clinical-200 p-8 text-center space-y-4 max-w-xl mx-auto shadow-sm my-4">
         <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200">
@@ -16,8 +24,20 @@ export default function ClinicianConversationBridge({
         </div>
         <h3 className="text-lg font-bold text-clinical-900">Conversation Bridge Locked</h3>
         <p className="text-xs text-clinical-600 leading-relaxed max-w-md mx-auto">
-          Conversation Bridge requires patient consent authorization. Patient has saved reflection entries but has not approved clinician sharing.
+          {consentError?.message || "Conversation Bridge requires patient consent authorization. Patient has saved reflection entries but has not approved clinician sharing."}
         </p>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-800 text-left max-w-md mx-auto font-medium">
+          <strong>Privacy Protocol:</strong> To view Conversation Bridge prompts and evidence, switch to Patient View and click "Approve & Share with Clinician".
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading || !patientData || (!patientData.journalEntries && !patientData.aiInsightReport)) {
+    return (
+      <div className="bg-white rounded-2xl border border-clinical-200 p-12 text-center space-y-3">
+        <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin mx-auto" />
+        <p className="text-xs text-clinical-600 font-medium">Loading Conversation Bridge for {patientData?.name || 'patient'}...</p>
       </div>
     );
   }

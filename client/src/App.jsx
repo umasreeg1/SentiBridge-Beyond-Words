@@ -24,6 +24,7 @@ export default function App() {
   const [isInsightMapOpen, setIsInsightMapOpen] = useState(false);
   const [consentError, setConsentError] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingInsight, setIsLoadingInsight] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
 
   // Initial load
@@ -62,6 +63,27 @@ export default function App() {
       .then(data => setPatientSelfData(data))
       .catch(err => console.error('Error fetching patient self view:', err));
 
+    // Load Insight Map data for therapist view
+    setIsLoadingInsight(true);
+    setConsentError(null);
+    fetchInsightMap(selectedPatientId)
+      .then(data => {
+        setActivePatientData(data);
+        setConsentError(null);
+      })
+      .catch(err => {
+        console.warn('Insight Map load for selected patient:', err);
+        if (err.status === 403 || err.data?.error === 'PATIENT_CONSENT_REQUIRED') {
+          setConsentError(err.data || { message: err.message });
+        } else {
+          setConsentError({ message: 'Failed to retrieve report: ' + err.message });
+        }
+        setActivePatientData(null);
+      })
+      .finally(() => {
+        setIsLoadingInsight(false);
+      });
+
   }, [selectedPatientId]);
 
   // Open Therapist Insight Map (Enforcing Backend Access Control)
@@ -70,7 +92,6 @@ export default function App() {
     setSelectedPatientId(idToUse);
     setIsInsightMapOpen(true);
     setConsentError(null);
-    setActivePatientData(null);
 
     try {
       const data = await fetchInsightMap(idToUse);
@@ -132,6 +153,25 @@ export default function App() {
     setPatients(pts);
     const selfData = await fetchPatientSelfView(patientId);
     setPatientSelfData(selfData);
+
+    if (patientId === selectedPatientId) {
+      if (res.hasApprovedSharing) {
+        try {
+          const mapData = await fetchInsightMap(patientId);
+          setActivePatientData(mapData);
+          setConsentError(null);
+        } catch (err) {
+          setConsentError(err.data || { message: err.message });
+          setActivePatientData(null);
+        }
+      } else {
+        setActivePatientData(null);
+        setConsentError({
+          error: 'PATIENT_CONSENT_REQUIRED',
+          message: 'Access Denied: The patient has not approved sharing their reflection report with clinical providers.'
+        });
+      }
+    }
     return res;
   };
 
@@ -142,6 +182,25 @@ export default function App() {
     setPatients(pts);
     const selfData = await fetchPatientSelfView(patientId);
     setPatientSelfData(selfData);
+
+    if (patientId === selectedPatientId) {
+      if (status === 'APPROVED') {
+        try {
+          const mapData = await fetchInsightMap(patientId);
+          setActivePatientData(mapData);
+          setConsentError(null);
+        } catch (err) {
+          setConsentError(err.data || { message: err.message });
+          setActivePatientData(null);
+        }
+      } else {
+        setActivePatientData(null);
+        setConsentError({
+          error: 'PATIENT_CONSENT_REQUIRED',
+          message: 'Access Denied: The patient has not approved sharing their reflection report with clinical providers.'
+        });
+      }
+    }
     return res;
   };
 
@@ -170,7 +229,7 @@ export default function App() {
         ) : (
           <>
             {/* VIEW 1: THERAPIST DASHBOARD */}
-            {activeView === 'therapist' && !isInsightMapOpen && (
+            {activeView === 'therapist' && (
               <TherapistDashboard
                 patients={patients}
                 selectedPatientId={selectedPatientId}
@@ -181,19 +240,13 @@ export default function App() {
                   setActiveView('patient');
                 }}
                 patientDataMap={{ [selectedPatientId]: activePatientData }}
+                activeInsightData={activePatientData}
+                isLoadingInsight={isLoadingInsight}
+                isInsightMapOpen={isInsightMapOpen}
+                onCloseInsightMap={() => setIsInsightMapOpen(false)}
+                consentError={consentError}
                 onRefreshSuggestions={handleRegenerateInsight}
                 isRefreshing={isRegenerating}
-              />
-            )}
-
-            {/* INSIGHT MAP MODAL / SCREEN D */}
-            {activeView === 'therapist' && isInsightMapOpen && (
-              <TherapistInsightMap
-                patientData={activePatientData}
-                onClose={() => setIsInsightMapOpen(false)}
-                onRegenerateInsight={handleRegenerateInsight}
-                isRegenerating={isRegenerating}
-                consentError={consentError}
               />
             )}
 
