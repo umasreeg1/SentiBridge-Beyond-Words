@@ -1,0 +1,154 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+/**
+ * AI Insight Engine Service using Gemini API
+ */
+
+export async function generateInsightReport(patientData) {
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  // Check if API Key is available
+  if (!apiKey || apiKey.trim() === "" || apiKey === "your_gemini_api_key_here") {
+    console.log("ℹ️ GEMINI_API_KEY not configured. Operating in DEMO MODE.");
+    return generateDemoInsight(patientData, "GEMINI_API_KEY is not configured in server environment. Using structured hackathon Demo Mode.");
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const promptText = `
+You are an expert AI clinical documentation assistant for therapists using the SentiBridge platform.
+Your objective is to organize patient-reported reflection data into a structured therapist pre-session insight map.
+
+STRICT CONSTRAINTS & CLINICAL SAFETY RULES:
+1. Do NOT diagnose any psychological conditions (e.g., depression, anxiety, PTSD, trauma, disorders).
+2. Do NOT assign numerical distress scores, severity rankings, or claim to detect "hidden" unconscious emotions.
+3. NEVER invent or hallucinate patient details not present in the input.
+4. Distinguish clearly between patient-reported facts and AI-suggested follow-up questions.
+5. Every item in 'recurringTopics' MUST cite supporting evidence directly from the provided patient journal entries or topic preferences.
+6. Return ONLY valid JSON matching the specified JSON schema. Do not include markdown codeblock wrappers like \`\`\`json.
+
+PATIENT REPORTED DATA:
+- Patient Name: ${patientData.name || 'Patient'}
+- Life Map Ratings/State: ${JSON.stringify(patientData.lifeMap || {})}
+- Topic Preferences: ${JSON.stringify(patientData.topicPreferences || [])}
+- Journal Entries: ${JSON.stringify(patientData.journalEntries || [])}
+- Situation Story Responses: ${JSON.stringify(patientData.situationStories || [])}
+- Support Compass Preferences: ${JSON.stringify(patientData.supportCompass || {})}
+
+REQUIRED JSON FORMAT:
+{
+  "patientReportedConcerns": ["string..."],
+  "importantExcerpts": ["direct quotes from journal entries..."],
+  "recurringTopics": [
+    {
+      "topic": "string",
+      "supportingEntries": ["string citing specific entry or preference..."]
+    }
+  ],
+  "topicsDifficultToDiscuss": ["string..."],
+  "patientStatedSupportPreferences": ["string..."],
+  "unansweredQuestions": ["string..."],
+  "suggestedConversationStarters": ["string..."],
+  "concisePreSessionSummary": "string"
+}
+`;
+
+    const response = await model.generateContent(promptText);
+    const responseText = response.response.text();
+    
+    // Clean response text if it contains markdown JSON wrappers
+    const cleanedJsonText = responseText
+      .replace(/```json/g, '')
+      .replace(/```/g, '')
+      .trim();
+
+    const parsedData = JSON.parse(cleanedJsonText);
+
+    return {
+      ...parsedData,
+      generatedAt: new Date().toISOString(),
+      isDemoMode: false,
+      modelUsed: "gemini-1.5-flash"
+    };
+  } catch (error) {
+    console.error("⚠️ Gemini API Call failed:", error.message);
+    return generateDemoInsight(
+      patientData,
+      `Gemini API Error: ${error.message}. Fallback to SentiBridge Demo Engine.`
+    );
+  }
+}
+
+/**
+ * Pure fallback DEMO MODE generator when no API key is set or API call fails.
+ */
+export function generateDemoInsight(patientData, fallbackReason = "Hackathon Demo Mode") {
+  const journalTexts = (patientData.journalEntries || [])
+    .map(j => j.mindContent || j.difficultSituation || "")
+    .filter(Boolean);
+
+  const excerpts = journalTexts.length > 0 
+    ? journalTexts.map(t => `"${t.length > 120 ? t.substring(0, 117) + "..." : t}"`)
+    : ["\"Patient has not provided journal text excerpts yet.\""];
+
+  const difficultTopics = (patientData.topicPreferences || [])
+    .filter(t => t.status === "DIFFICULT_TO_DISCUSS" || t.status === "NOT_READY")
+    .map(t => `${t.topic} (${t.status === "NOT_READY" ? "Not ready to discuss" : "Difficult to discuss"})`);
+
+  const wantHelpTopics = (patientData.topicPreferences || [])
+    .filter(t => t.status === "WANT_HELP")
+    .map(t => t.topic);
+
+  const supportPrefs = [];
+  if (patientData.supportCompass) {
+    if (patientData.supportCompass.beingListenedTo) supportPrefs.push("Wants dedicated time to be listened to without immediate interruption");
+    if (patientData.supportCompass.practicalSuggestions) supportPrefs.push("Appreciates practical, actionable suggestions");
+    if (patientData.supportCompass.timeToThink) supportPrefs.push("Needs extra processing time before answering complex questions");
+    if (patientData.supportCompass.writingInsteadOfSpeaking) supportPrefs.push("Prefers writing difficult thoughts down before verbal discussion");
+    if (patientData.supportCompass.helpMakingAPlan) supportPrefs.push("Wants collaborative assistance in creating structured step-by-step plans");
+    if (patientData.supportCompass.otherPreferences) supportPrefs.push(`Custom preference: ${patientData.supportCompass.otherPreferences}`);
+  }
+
+  const recurring = [];
+  if (difficultTopics.length > 0) {
+    recurring.push({
+      topic: "Sensitive Topic Avoidance / Communication Barriers",
+      supportingEntries: [`Explicitly marked topics: ${difficultTopics.join(", ")}`]
+    });
+  }
+  if (journalTexts.length > 0) {
+    recurring.push({
+      topic: "Self-Reported Situational Stress & Pressure",
+      supportingEntries: ["Reflected in submitted Mind Journal entries", "Life Map indicators"]
+    });
+  }
+
+  return {
+    generatedAt: new Date().toISOString(),
+    isDemoMode: true,
+    demoNotice: fallbackReason,
+    patientReportedConcerns: wantHelpTopics.length > 0 
+      ? wantHelpTopics.map(t => `Patient requested assistance with: ${t}`)
+      : ["Patient provided general life map stress indicators."],
+    importantExcerpts: excerpts,
+    recurringTopics: recurring.length > 0 ? recurring : [
+      {
+        topic: "General Pre-session Reflection",
+        supportingEntries: ["Submitted Patient Life Map & Support Preferences"]
+      }
+    ],
+    topicsDifficultToDiscuss: difficultTopics.length > 0 ? difficultTopics : ["None explicitly marked as difficult"],
+    patientStatedSupportPreferences: supportPrefs.length > 0 ? supportPrefs : ["General supportive therapy preferences"],
+    unansweredQuestions: [
+      `What specific triggers or environments make ${difficultTopics[0] || 'difficult topics'} feel hardest to address?`,
+      "How would the patient like to pace today's session standard check-in?"
+    ],
+    suggestedConversationStarters: [
+      `"${patientData.name || 'Patient'}, I reviewed your pre-session reflection notes. You mentioned wanting help with ${wantHelpTopics[0] || 'your concerns'}. Would you like to start there today?"`,
+      `"You noted that having extra time to think is helpful for you. Please feel free to take pause moments whenever you need during our conversation today."`
+    ],
+    concisePreSessionSummary: `${patientData.name || 'The patient'} submitted a pre-session reflection highlighting key focus areas including ${wantHelpTopics.join(", ") || "general wellness"}. ${difficultTopics.length > 0 ? `Sensitive areas marked for gentle handling include ${difficultTopics.join(", ")}.` : ""}`
+  };
+}
