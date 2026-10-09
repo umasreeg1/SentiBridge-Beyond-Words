@@ -15,7 +15,21 @@ export async function generateInsightReport(patientData) {
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.8-flash" });
+
+    // Enforce sending ONLY patient-submitted, approved-for-processing information
+    const allowedSections = patientData.consentDetails?.sharedSections || [
+      'lifeMap', 'topicPreferences', 'journalExcerpts', 'supportCompass', 'scenarios'
+    ];
+
+    const approvedDataToProcess = {
+      name: patientData.name || 'Patient',
+      lifeMap: allowedSections.includes('lifeMap') ? patientData.lifeMap : null,
+      topicPreferences: allowedSections.includes('topicPreferences') ? patientData.topicPreferences : [],
+      journalEntries: allowedSections.includes('journalExcerpts') ? patientData.journalEntries : [],
+      situationStories: allowedSections.includes('scenarios') ? patientData.situationStories : [],
+      supportCompass: allowedSections.includes('supportCompass') ? patientData.supportCompass : null
+    };
 
     const promptText = `
 You are an expert AI clinical documentation assistant for therapists using the SentiBridge platform.
@@ -24,23 +38,24 @@ Your objective is to organize patient-reported reflection data into a structured
 STRICT CONSTRAINTS & CLINICAL SAFETY RULES:
 1. Do NOT diagnose any psychological conditions (e.g., depression, anxiety, PTSD, trauma, disorders).
 2. Do NOT assign numerical distress scores, severity rankings, or claim to detect "hidden" unconscious emotions.
-3. NEVER invent or hallucinate patient details not present in the input.
-4. Distinguish clearly between patient-reported facts and AI-suggested follow-up questions.
-5. Every item in 'recurringTopics' MUST cite supporting evidence directly from the provided patient journal entries or topic preferences.
-6. Return ONLY valid JSON matching the specified JSON schema. Do not include markdown codeblock wrappers like \`\`\`json.
+3. NEVER invent, hallucinate, or assume patient details not present in the provided input.
+4. Only include verbatim quotes in 'importantExcerpts' that exist word-for-word in the patient's submitted journal entries.
+5. Every item in 'recurringTopics' MUST cite actual patient-provided evidence in 'supportingEntries'.
+6. Clearly distinguish patient-reported statements from AI-generated conversation starters.
+7. Return ONLY valid JSON matching the specified JSON schema. Do not include markdown codeblock wrappers like \`\`\`json.
 
-PATIENT REPORTED DATA:
-- Patient Name: ${patientData.name || 'Patient'}
-- Life Map Ratings/State: ${JSON.stringify(patientData.lifeMap || {})}
-- Topic Preferences: ${JSON.stringify(patientData.topicPreferences || [])}
-- Journal Entries: ${JSON.stringify(patientData.journalEntries || [])}
-- Situation Story Responses: ${JSON.stringify(patientData.situationStories || [])}
-- Support Compass Preferences: ${JSON.stringify(patientData.supportCompass || {})}
+PATIENT REPORTED DATA (APPROVED FOR PROCESSING):
+- Patient Name: ${approvedDataToProcess.name}
+- Life Map Ratings/State: ${JSON.stringify(approvedDataToProcess.lifeMap || {})}
+- Topic Preferences: ${JSON.stringify(approvedDataToProcess.topicPreferences || [])}
+- Journal Entries: ${JSON.stringify(approvedDataToProcess.journalEntries || [])}
+- Situation Story Responses: ${JSON.stringify(approvedDataToProcess.situationStories || [])}
+- Support Compass Preferences: ${JSON.stringify(approvedDataToProcess.supportCompass || {})}
 
 REQUIRED JSON FORMAT:
 {
   "patientReportedConcerns": ["string..."],
-  "importantExcerpts": ["direct quotes from journal entries..."],
+  "importantExcerpts": ["direct verbatim quotes from journal entries..."],
   "recurringTopics": [
     {
       "topic": "string",
